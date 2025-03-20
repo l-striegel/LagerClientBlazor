@@ -28,13 +28,19 @@ Eine moderne Blazor WebAssembly-Anwendung zur Verwaltung von Lagerartikeln mit E
 3. Anwendung starten: `dotnet run --project Client/Client.csproj`
 4. Im Browser öffnen: http://localhost:5148
 ### Online-Demo
-Eine live-Demo der Anwendung ist verfügbar unter: [https://l-striegel.github.io/LagerClientBlazor/](https://l-striegel.github.io/LagerClientBlazor/)
-Dabei kann die article.json importiert werden um Demodaten zur Verfügung zu haben.
+Eine funktionsfähige Demo der Anwendung ist unter [https://l-striegel.github.io/LagerClientBlazor/](https://l-striegel.github.io/LagerClientBlazor/) verfügbar.
+Durch Import der mitgelieferten `article.json` (oder [hier](https://github.com/l-striegel/LagerClientBlazor/releases/download/v1.0.0/articles.json) zum direkt herunterladen) können Beispieldaten geladen werden, um alle Funktionen direkt auszuprobieren.
 ### Offline-Modus ohne Backend-API
 Die Anwendung kann vollständig ohne Backend-API verwendet werden:
 1. Die `articles.json` im Hauptverzeichnis enthält Beispieldaten
 2. Die Daten werden automatisch in den localStorage des Browsers geladen
 3. Alle Änderungen werden lokal gespeichert und können später synchronisiert werden
+### Backend-API Integration
+Die Anwendung unterstützt die Verbindung mit einer Backend-API für zentralisierte Datenhaltung:
+- Standard-API-URL: `https://localhost:5001/api/article`
+- Vollständig offline funktionsfähig mit lokaler Datenspeicherung
+- Intelligente Konfliktlösung bei der Synchronisierung
+- API-Implementierung verfügbar unter: [LagerAPI](https://github.com/l-striegel/LagerAPI)
 ## Architektur
 Die Anwendung ist nach einem Service-basierten Pattern mit reaktivem State-Management strukturiert:
 - **Models**: Repräsentieren Lagerartikel und ihre Eigenschaften (Article, CellStyle)
