@@ -1,0 +1,39 @@
+# .NET Build-Artefakte
+bin/
+obj/
+*.user
+*.suo
+.vs/
+_ReSharper*/
+*.sln.iml
+
+# Debug-Dateien
+*.log
+*.dbmdl
+*.jfm
+
+# NuGet-Paketverzeichnisse
+packages/
+*.nupkg
+
+# Publish-Ordner
+publish/
+**/Properties/PublishProfiles/
+**/PublishProfiles/
+
+# Node-Module (falls vorhanden)
+node_modules/
+npm-debug.log
+
+# Disabled-Ordner mit Login-Seiten
+**/Disabled/
+
+# Lokale Konfigurationsdateien
+appsettings.Development.json
+appsettings.local.json
+local.settings.json
+
+# IDE-spezifische Dateien
+.idea/
+.vscode/
+.vs/

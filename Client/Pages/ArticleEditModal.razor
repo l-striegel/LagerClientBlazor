@@ -1,0 +1,129 @@
+@using LagerClient.Blazor.Shared.Models
+@using LagerClient.Blazor.Client.Services
+@using Blazored.Modal
+@using Blazored.Modal.Services
+@inject IOfflineArticleService ArticleService
+@inject LagerClient.Blazor.Client.Services.ModalServiceWrapper ModalService
+@inject Blazored.Toast.Services.IToastService ToastService
+
+<div class="modal-content">
+    <div class="modal-header">
+        <h5 class="modal-title">@ModalTitle</h5>
+        <button type="button" class="btn-close" @onclick="@(() => Close(false))"></button>
+    </div>
+    <div class="modal-body">
+        <EditForm Model="@article" OnValidSubmit="@HandleValidSubmit">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="mb-3">
+                <label for="name" class="form-label">Name</label>
+                <InputText id="name" @bind-Value="article.Name" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+                <label for="type" class="form-label">Typ</label>
+                <InputText id="type" @bind-Value="article.Type" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+                <label for="stock" class="form-label">Bestand</label>
+                <InputNumber id="stock" @bind-Value="article.Stock" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+                <label for="unit" class="form-label">Einheit</label>
+                <InputText id="unit" @bind-Value="article.Unit" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+                <label for="price" class="form-label">Preis (€)</label>
+                <InputNumber id="price" @bind-Value="article.Price" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+                <label for="location" class="form-label">Lagerort</label>
+                <InputText id="location" @bind-Value="article.Location" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+                <label for="status" class="form-label">Status</label>
+                <InputSelect id="status" @bind-Value="article.Status" class="form-select">
+                    <option value="Auf Lager">Auf Lager</option>
+                    <option value="Bestellt">Bestellt</option>
+                    <option value="Nicht verfügbar">Nicht verfügbar</option>
+                </InputSelect>
+            </div>
+
+            <div class="mb-3">
+                <label for="link" class="form-label">Link</label>
+                <InputText id="link" @bind-Value="article.Link" class="form-control" />
+            </div>
+
+            <div class="mt-4 d-flex justify-content-between">
+                <button type="button" class="btn btn-secondary" @onclick="@(() => Close(false))">Abbrechen</button>
+                <button type="submit" class="btn btn-primary">Speichern</button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter] BlazoredModalInstance BlazoredModal { get; set; } = default!;
+    [Parameter] public Article Article { get; set; } = default!;
+    [Parameter] public EventCallback<Article> OnArticleSaved { get; set; } // Neuer Parameter für Callback
+
+    private Article article = new();
+    
+    private string ModalTitle => article.Id == 0 ? "Neuer Artikel" : "Artikel bearbeiten";
+
+    protected override void OnInitialized()
+    {
+        // Kopie erstellen, um Änderungen zu isolieren
+        article = new Article
+        {
+            Id = Article.Id,
+            Name = Article.Name,
+            Type = Article.Type,
+            Stock = Article.Stock,
+            Unit = Article.Unit,
+            Price = Article.Price,
+            Location = Article.Location,
+            Status = Article.Status ?? "Auf Lager",
+            Link = Article.Link,
+            Timestamp = Article.Timestamp,
+            StylesJson = Article.StylesJson,
+            Styles = new Dictionary<string, CellStyle>(Article.Styles)
+        };
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            // Serialisiere die Styles für die Speicherung
+            article.StylesJson = System.Text.Json.JsonSerializer.Serialize(article.Styles);
+            
+            var savedArticle = await ArticleService.SaveArticleAsync(article);
+            
+            ToastService.ShowSuccess("Artikel erfolgreich gespeichert");
+            
+            // Callback ausführen, um die Tabelle zu aktualisieren
+            if (OnArticleSaved.HasDelegate)
+            {
+                await OnArticleSaved.InvokeAsync(savedArticle);
+            }
+            
+            await Close(true);
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Fehler beim Speichern: {ex.Message}");
+        }
+    }
+
+    private async Task Close(bool success = false)
+    {
+        await BlazoredModal.CloseAsync(ModalResult.Ok(success));
+    }
+}

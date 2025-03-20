@@ -1,0 +1,103 @@
+@page "/settings"
+@namespace LagerClient.Blazor.Client.Pages
+@using LagerClient.Blazor.Client.Services
+@inject IAppConfigService ConfigService
+@inject Blazored.Toast.Services.IToastService ToastService
+@inject IAppStateService AppState
+
+<h3>Einstellungen</h3>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                API-Konfiguration
+            </div>
+            <div class="card-body">
+                <EditForm Model="@config" OnValidSubmit="@SaveConfig">
+                    <div class="mb-3">
+                        <label for="apiUrl" class="form-label">API URL</label>
+                        <InputText id="apiUrl" @bind-Value="config.ApiUrl" class="form-control" />
+                        <div class="form-text">Adresse der Backend-API (z.B. https://meinserver.de/api/article oder http://localhost:5001/api/article)</div>
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <InputCheckbox id="debugMode" @bind-Value="config.IsDebugMode" class="form-check-input" />
+                        <label class="form-check-label" for="debugMode">Debug-Modus aktivieren</label>
+                        <div class="form-text">Zeigt zusätzliche Informationen und Debug-Elemente in der Benutzeroberfläche an</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="tableRowHeight" class="form-label">Tabellenzeilenhöhe</label>
+                        <InputNumber id="tableRowHeight" @bind-Value="config.UiSettings.TableRowHeight" class="form-control" />
+                        <div class="form-text">Höhe der Tabellenzeilen in Pixeln</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="tableZebraColor" class="form-label">Tabellen-Zebrafarbe</label>
+                        <div class="d-flex">
+                            <InputText id="tableZebraColor" @bind-Value="config.UiSettings.TableZebraColor" class="form-control me-2" />
+                            <input type="color" @bind="config.UiSettings.TableZebraColor" class="form-control form-control-color" />
+                        </div>
+                        <div class="form-text">Hintergrundfarbe für abwechselnde Zeilen in der Tabelle</div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Speichern</button>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+    
+    @if (config.IsDebugMode)
+    {
+        <div class="col-md-6">
+            <div class="card bg-light">
+                <div class="card-header">
+                    Debug-Informationen
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <strong>Debug-Modus ist aktiv!</strong>
+                        <p>Im Debug-Modus werden zusätzliche Informationen und Debug-Elemente angezeigt, z.B.:</p>
+                        <ul>
+                            <li>Detaillierte Auswahlinfo für Tabellenzellen</li>
+                            <li>Erweiterte Konsolen-Ausgaben</li>
+                            <li>Zusätzliche Diagnose-Informationen</li>
+                        </ul>
+                    </div>
+                    
+                    <h5 class="mt-3">Aktuelle Konfiguration:</h5>
+                    <pre>@System.Text.Json.JsonSerializer.Serialize(config, new System.Text.Json.JsonSerializerOptions { WriteIndented = true })</pre>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<div class="mt-5 text-muted small">
+    <hr />
+    <p class="text-center">LagerClient v1.0.0</p>
+</div>
+
+@code {
+    private AppConfig config = new();
+    
+    protected override async Task OnInitializedAsync()
+    {
+        config = await ConfigService.GetConfigAsync();
+        Console.WriteLine($"Settings initialisiert - Debug-Modus: {config.IsDebugMode}");
+    }
+    
+    private async Task SaveConfig()
+    {
+        Console.WriteLine($"Speichere Konfiguration - Debug-Modus: {config.IsDebugMode}");
+        
+        // Das AppConfigService aktualisiert bereits den AppStateService
+        await ConfigService.UpdateConfigAsync(config);
+        
+        // Doppelte Benachrichtigung zur Sicherheit
+        await AppState.UpdateConfigAsync(config);
+        
+        ToastService.ShowSuccess("Einstellungen wurden gespeichert");
+    }
+}

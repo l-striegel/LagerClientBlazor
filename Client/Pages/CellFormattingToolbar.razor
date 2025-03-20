@@ -1,0 +1,314 @@
+@using LagerClient.Blazor.Shared.Models
+@using LagerClient.Blazor.Client.Services
+@inject IOfflineArticleService ArticleService
+@inject Blazored.Toast.Services.IToastService ToastService
+
+<div class="mb-3 p-2 bg-light rounded-3">
+    <div class="row mb-2">
+        <div class="col-md-6 d-flex align-items-center">
+            <div class="btn-group me-3">
+                <button class="btn btn-sm @(IsBold ? "btn-primary" : "btn-outline-primary")" 
+                        @onclick="ToggleBold" disabled="@(!HasSelectedCells)">
+                    <strong>B</strong>
+                </button>
+                <button class="btn btn-sm @(IsItalic ? "btn-primary" : "btn-outline-primary")" 
+                        @onclick="ToggleItalic" disabled="@(!HasSelectedCells)">
+                    <i>I</i>
+                </button>
+            </div>
+            
+            <div class="d-flex align-items-center">
+                <label class="me-2">Farbe:</label>
+                <input type="color" class="form-control form-control-sm form-control-color" 
+                    value="@CurrentColor" @onchange="ChangeColor" 
+                    disabled="@(!HasSelectedCells)" />
+            </div>
+            <span class="ms-2 text-info" 
+                style="cursor: help; user-select: none;" 
+                title="Tipp: Strg+Klick für Mehrfachauswahl, Shift+Klick für Bereichsauswahl">
+                &#x1F6C8; <!-- Unicode Info-Symbol -->
+            </span>
+        </div>
+    </div>
+    
+    @if (ShowSelectedCellInfo && HasSelectedCells && IsDebugMode)
+    {
+        <div class="row">
+            <div class="col-12">
+                <div class="d-flex align-items-center bg-light-blue p-2 rounded">
+                    <span class="badge bg-info me-2">Zelle ausgewählt:</span>
+                    <span class="fw-bold me-auto">@SelectedPropertyName (@SelectedArticleName)</span>
+                    <button class="btn btn-sm btn-outline-primary" @onclick="() => OnEditRequested.InvokeAsync()">
+                        <i class="oi oi-pencil"></i> Bearbeiten
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public List<(Article Article, string Property)> SelectedCells { get; set; } = new();
+    
+    [Parameter]
+    public Article? SingleSelectedArticle { get; set; }
+    
+    [Parameter]
+    public string? SingleSelectedProperty { get; set; }
+    
+    [Parameter]
+    public bool IsDebugMode { get; set; }
+    
+    [Parameter]
+    public bool ShowSelectedCellInfo { get; set; } = true;
+    
+    [Parameter]
+    public EventCallback OnFormatApplied { get; set; }
+    
+    [Parameter]
+    public EventCallback OnEditRequested { get; set; }
+
+    private bool HasSelectedCells => SelectedCells.Count > 0;
+
+    private string SelectedArticleName => SingleSelectedArticle?.Name ?? "";
+    
+    private string SelectedPropertyName => SingleSelectedProperty ?? "";
+    
+    private bool IsBold 
+    {
+        get
+        {
+            // Falls mehrere Zellen ausgewählt sind, prüfe ob ALLE fett sind
+            if (SelectedCells.Count > 0)
+            {
+                return SelectedCells.All(cell => 
+                {
+                    var article = cell.Article;
+                    var property = cell.Property;
+                    return article.Styles.TryGetValue(property, out var style) && style.Bold;
+                });
+            }
+            
+            // Fallback auf Einzelauswahl
+            return GetStyleForSelectedCell()?.Bold ?? false;
+        }
+    }
+
+    private bool IsItalic
+    {
+        get
+        {
+            // Falls mehrere Zellen ausgewählt sind, prüfe ob ALLE kursiv sind
+            if (SelectedCells.Count > 0)
+            {
+                return SelectedCells.All(cell => 
+                {
+                    var article = cell.Article;
+                    var property = cell.Property;
+                    return article.Styles.TryGetValue(property, out var style) && style.Italic;
+                });
+            }
+            
+            // Fallback auf Einzelauswahl
+            return GetStyleForSelectedCell()?.Italic ?? false;
+        }
+    }
+
+    private string CurrentColor
+    {
+        get
+        {
+            // Bei mehreren ausgewählten Zellen:
+            // - Wenn alle die gleiche Farbe haben, zeige diese
+            // - Sonst zeige Standardfarbe
+            if (SelectedCells.Count > 0)
+            {
+                string? commonColor = null;
+                bool allSameColor = true;
+                
+                foreach (var cell in SelectedCells)
+                {
+                    if (cell.Article.Styles.TryGetValue(cell.Property, out var style))
+                    {
+                        if (commonColor == null)
+                        {
+                            commonColor = style.Color;
+                        }
+                        else if (commonColor != style.Color)
+                        {
+                            allSameColor = false;
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        allSameColor = false;
+                        break;
+                    }
+                }
+                
+                if (allSameColor && commonColor != null)
+                {
+                    return commonColor;
+                }
+            }
+            
+            // Fallback auf Einzelauswahl oder Standardwert
+            return GetStyleForSelectedCell()?.Color ?? "#000000";
+        }
+    }
+    
+    private CellStyle? GetStyleForSelectedCell()
+    {
+        if (SingleSelectedArticle == null || SingleSelectedProperty == null)
+            return null;
+            
+        return SingleSelectedArticle.Styles.TryGetValue(SingleSelectedProperty, out var style) ? style : null;
+    }
+    
+    private CellStyle GetOrCreateStyle(Article article, string property)
+    {
+        if (!article.Styles.TryGetValue(property, out var style))
+        {
+            style = new CellStyle();
+            article.Styles[property] = style;
+        }
+        return style;
+    }
+    
+    private async Task ToggleBold()
+    {
+        if (!HasSelectedCells) return;
+        
+        // Sammle alle betroffenen Artikel (um doppelte Speicherungen zu vermeiden)
+        var articlesToUpdate = new Dictionary<int, Article>();
+        
+        // Bestimme den neuen Zustand (invertiere den aktuellen Zustand)
+        bool newBoldState = !IsBold;
+        
+        // Wende die Änderung auf alle gewählten Zellen an
+        foreach (var (article, property) in SelectedCells)
+        {
+            var style = GetOrCreateStyle(article, property);
+            style.Bold = newBoldState;
+            article.Styles[property] = style;
+            
+            // Merke Artikel für Update
+            if (!articlesToUpdate.ContainsKey(article.Id))
+            {
+                articlesToUpdate[article.Id] = article;
+            }
+        }
+        
+        // Speichere alle geänderten Artikel
+        try 
+        {
+            foreach (var article in articlesToUpdate.Values)
+            {
+                var articleToSave = CloneArticleForSaving(article);
+                await ArticleService.SaveArticleAsync(articleToSave);
+            }
+            
+            ToastService.ShowSuccess($"{SelectedCells.Count} Zellen formatiert");
+            await OnFormatApplied.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Fehler beim Ändern der Formatierung: {ex.Message}");
+            ToastService.ShowError($"Fehler bei der Formatierung: {ex.Message}");
+        }
+    }
+    
+    private async Task ToggleItalic()
+    {
+        if (!HasSelectedCells) return;
+        
+        var articlesToUpdate = new Dictionary<int, Article>();
+        bool newItalicState = !IsItalic;
+        
+        foreach (var (article, property) in SelectedCells)
+        {
+            var style = GetOrCreateStyle(article, property);
+            style.Italic = newItalicState;
+            article.Styles[property] = style;
+            
+            if (!articlesToUpdate.ContainsKey(article.Id))
+            {
+                articlesToUpdate[article.Id] = article;
+            }
+        }
+        
+        try 
+        {
+            foreach (var article in articlesToUpdate.Values)
+            {
+                var articleToSave = CloneArticleForSaving(article);
+                await ArticleService.SaveArticleAsync(articleToSave);
+            }
+            
+            ToastService.ShowSuccess($"{SelectedCells.Count} Zellen formatiert");
+            await OnFormatApplied.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Fehler beim Ändern der Formatierung: {ex.Message}");
+            ToastService.ShowError($"Fehler bei der Formatierung: {ex.Message}");
+        }
+    }
+
+    private async Task ChangeColor(ChangeEventArgs e)
+    {
+        if (!HasSelectedCells || !(e.Value is string colorValue)) return;
+        
+        var articlesToUpdate = new Dictionary<int, Article>();
+        
+        foreach (var (article, property) in SelectedCells)
+        {
+            var style = GetOrCreateStyle(article, property);
+            style.Color = colorValue;
+            article.Styles[property] = style;
+            
+            if (!articlesToUpdate.ContainsKey(article.Id))
+            {
+                articlesToUpdate[article.Id] = article;
+            }
+        }
+        
+        try 
+        {
+            foreach (var article in articlesToUpdate.Values)
+            {
+                var articleToSave = CloneArticleForSaving(article);
+                await ArticleService.SaveArticleAsync(articleToSave);
+            }
+            
+            ToastService.ShowSuccess($"{SelectedCells.Count} Zellen formatiert");
+            await OnFormatApplied.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Fehler beim Ändern der Formatierung: {ex.Message}");
+            ToastService.ShowError($"Fehler bei der Formatierung: {ex.Message}");
+        }
+    }
+    
+    // Hilfsmethode zum Erstellen einer sauberen Kopie eines Artikels zum Speichern
+    private Article CloneArticleForSaving(Article original)
+    {
+        return new Article
+        {
+            Id = original.Id,
+            Name = original.Name,
+            Type = original.Type,
+            Stock = original.Stock,
+            Unit = original.Unit,
+            Price = original.Price,
+            Location = original.Location,
+            Status = original.Status,
+            Link = original.Link,
+            Timestamp = original.Timestamp,
+            Styles = new Dictionary<string, CellStyle>(original.Styles) // Erstelle ein neues Dictionary mit den gleichen Einträgen
+        };
+    }
+}

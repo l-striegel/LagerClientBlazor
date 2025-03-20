@@ -1,0 +1,329 @@
+@namespace LagerClient.Blazor.Client.Pages
+@page "/sync-resolution-modal"
+@using LagerClient.Blazor.Shared.Models
+@using LagerClient.Blazor.Client.Services
+@inject IJSRuntime JSRuntime
+
+<div class="modal-content">
+    <div class="modal-header">
+        <h5 class="modal-title">Synchronisierungskonflikte lösen</h5>
+        <button type="button" class="btn-close" @onclick="Cancel"></button>
+    </div>
+    <div class="modal-body">
+        <p>Es wurden @Differences.Count Unterschiede zwischen Ihren lokalen Daten und dem Server gefunden.</p>
+        <p>Bitte entscheiden Sie für jeden Artikel, welche Version Sie behalten möchten.</p>
+        
+        <div class="mb-3">
+            <div class="d-flex justify-content-end">
+                <button class="btn btn-sm btn-outline-secondary me-2" @onclick="SelectAllLocal">
+                    Alle lokal auswählen
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="SelectAllServer">
+                    Alle Server auswählen
+                </button>
+            </div>
+        </div>
+        
+        <div class="table-responsive mb-3" style="max-height: 400px; overflow-y: auto;">
+            <table class="table table-sm table-hover">
+                <thead class="sticky-top bg-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Änderungen</th>
+                        <th>Entscheidung</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var diff in Differences)
+                    {
+                        <tr @onclick="() => SelectDifference(diff)" 
+                            class="@(selectedDifference == diff ? "table-primary" : "")">
+                            <td>
+                                @switch (diff.DifferenceType)
+                                {
+                                    case DifferenceType.NewLocal:
+                                        <span class="badge bg-info">Neu</span>
+                                        break;
+                                    case DifferenceType.NewOnServer:
+                                        <span>@diff.ServerArticle?.Id</span>
+                                        break;
+                                    case DifferenceType.DeletedOnServer:
+                                        <span class="text-decoration-line-through">@diff.LocalArticle?.Id</span>
+                                        break;
+                                    default:
+                                        <span>@diff.LocalArticle?.Id</span>
+                                        break;
+                                }
+                            </td>
+                            <td>
+                                @switch (diff.DifferenceType)
+                                {
+                                    case DifferenceType.NewLocal:
+                                        <span>@diff.LocalArticle?.Name</span>
+                                        break;
+                                    case DifferenceType.NewOnServer:
+                                        <span>@diff.ServerArticle?.Name</span>
+                                        break;
+                                    case DifferenceType.DeletedOnServer:
+                                        <span class="text-decoration-line-through">@diff.LocalArticle?.Name</span>
+                                        break;
+                                    default:
+                                        if (diff.LocalArticle?.Name != diff.ServerArticle?.Name)
+                                        {
+                                            <div class="diff-highlight">
+                                                <div>L: @diff.LocalArticle?.Name</div>
+                                                <div>S: @diff.ServerArticle?.Name</div>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span>@diff.LocalArticle?.Name</span>
+                                        }
+                                        break;
+                                }
+                            </td>
+                            <td>
+                                <span class="d-block small">@string.Join(", ", diff.ChangedProperties)</span>
+                            </td>
+                            <td>
+                                <select @bind="diff.Decision" class="form-select form-select-sm">
+                                    @switch (diff.DifferenceType)
+                                    {
+                                        case DifferenceType.NewLocal:
+                                            <option value="KeepLocal">Hochladen</option>
+                                            <option value="UseServer">Verwerfen</option>
+                                            break;
+                                        case DifferenceType.NewOnServer:
+                                            <option value="UseServer">Herunterladen</option>
+                                            <option value="KeepLocal">Ignorieren</option>
+                                            break;
+                                        case DifferenceType.DeletedOnServer:
+                                            <option value="KeepLocal">Wiederherstellen</option>
+                                            <option value="UseServer">Löschen</option>
+                                            break;
+                                        default:
+                                            <option value="KeepLocal">Lokale Version</option>
+                                            <option value="UseServer">Server-Version</option>
+                                            break;
+                                    }
+                                </select>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        
+        @if (selectedDifference != null && 
+              selectedDifference.DifferenceType == DifferenceType.Modified && 
+              selectedDifference.LocalArticle != null && 
+              selectedDifference.ServerArticle != null)
+        {
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0">Detailvergleich: @selectedDifference.LocalArticle.Name</h6>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-sm comparison-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Eigenschaft</th>
+                                <th>Lokal</th>
+                                <th>Server</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="@GetComparisonRowClass("Name")">
+                                <td>Name</td>
+                                <td>@selectedDifference.LocalArticle.Name</td>
+                                <td>@selectedDifference.ServerArticle.Name</td>
+                            </tr>
+                            <tr class="@GetComparisonRowClass("Typ")">
+                                <td>Typ</td>
+                                <td>@selectedDifference.LocalArticle.Type</td>
+                                <td>@selectedDifference.ServerArticle.Type</td>
+                            </tr>
+                            <tr class="@GetComparisonRowClass("Bestand")">
+                                <td>Bestand</td>
+                                <td>@selectedDifference.LocalArticle.Stock</td>
+                                <td>@selectedDifference.ServerArticle.Stock</td>
+                            </tr>
+                            <tr class="@GetComparisonRowClass("Einheit")">
+                                <td>Einheit</td>
+                                <td>@selectedDifference.LocalArticle.Unit</td>
+                                <td>@selectedDifference.ServerArticle.Unit</td>
+                            </tr>
+                            <tr class="@GetComparisonRowClass("Preis")">
+                                <td>Preis</td>
+                                <td>@selectedDifference.LocalArticle.Price.ToString("C")</td>
+                                <td>@selectedDifference.ServerArticle.Price.ToString("C")</td>
+                            </tr>
+                            <tr class="@GetComparisonRowClass("Lagerplatz")">
+                                <td>Lagerplatz</td>
+                                <td>@selectedDifference.LocalArticle.Location</td>
+                                <td>@selectedDifference.ServerArticle.Location</td>
+                            </tr>
+                            <tr class="@GetComparisonRowClass("Status")">
+                                <td>Status</td>
+                                <td>@selectedDifference.LocalArticle.Status</td>
+                                <td>@selectedDifference.ServerArticle.Status</td>
+                            </tr>
+                            <tr class="@GetComparisonRowClass("Link")">
+                                <td>Link</td>
+                                <td>@selectedDifference.LocalArticle.Link</td>
+                                <td>@selectedDifference.ServerArticle.Link</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-primary" @onclick="() => ApplyDecision(ResolutionDecision.KeepLocal)">
+                        Lokale Version übernehmen
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" @onclick="() => ApplyDecision(ResolutionDecision.UseServer)">
+                        Server-Version übernehmen
+                    </button>
+                </div>
+            </div>
+        }
+    </div>
+    <div class="modal-footer">
+        <span class="me-auto text-muted small">
+            @GetUndecidedCount() von @Differences.Count Entscheidungen ausstehend
+        </span>
+        <button type="button" class="btn btn-secondary" @onclick="Cancel">Abbrechen</button>
+        <button type="button" class="btn btn-primary" @onclick="ConfirmSync" 
+                disabled="@(GetUndecidedCount() > 0)">
+            Synchronisieren
+        </button>
+    </div>
+</div>
+
+<style>
+    .comparison-table tr.diff-row {
+        background-color: rgba(255, 193, 7, 0.1);
+    }
+    
+    .diff-highlight {
+        background-color: rgba(255, 193, 7, 0.1);
+        padding: 0.25rem;
+        border-radius: 3px;
+        font-size: 0.9em;
+    }
+</style>
+
+@code {
+    [CascadingParameter] BlazoredModalInstance BlazoredModal { get; set; } = default!;
+    [Parameter] public List<ArticleDifference> Differences { get; set; } = new();
+    
+    private ArticleDifference? selectedDifference;
+    
+    protected override void OnInitialized()
+    {
+        // Vorauswahl für einfache Fälle
+        foreach (var diff in Differences)
+        {
+            switch (diff.DifferenceType)
+            {
+                case DifferenceType.NewLocal:
+                    diff.Decision = ResolutionDecision.KeepLocal;  // Neue lokale Artikel hochladen
+                    break;
+                case DifferenceType.NewOnServer:
+                    diff.Decision = ResolutionDecision.UseServer;  // Neue Server-Artikel herunterladen
+                    break;
+                default:
+                    diff.Decision = ResolutionDecision.Undecided;
+                    break;
+            }
+        }
+        
+        // Selektiere den ersten Eintrag, falls vorhanden
+        if (Differences.Count > 0)
+        {
+            selectedDifference = Differences[0];
+        }
+    }
+    
+    private void SelectDifference(ArticleDifference diff)
+    {
+        selectedDifference = diff;
+    }
+    
+    private string GetComparisonRowClass(string property)
+    {
+        if (selectedDifference == null)
+            return "";
+            
+        return selectedDifference.ChangedProperties.Contains(property) ? "diff-row" : "";
+    }
+    
+    private int GetUndecidedCount()
+    {
+        return Differences.Count(d => d.Decision == ResolutionDecision.Undecided);
+    }
+    
+    private void SelectAllLocal()
+    {
+        foreach (var diff in Differences)
+        {
+            if (diff.DifferenceType == DifferenceType.DeletedOnServer)
+            {
+                // Beim Server-gelöschten Artikel ist "KeepLocal" die Wiederherstellung
+                diff.Decision = ResolutionDecision.KeepLocal;
+            }
+            else if (diff.DifferenceType == DifferenceType.NewOnServer)
+            {
+                // Bei neuen Server-Artikeln ist "KeepLocal" das Ignorieren
+                diff.Decision = ResolutionDecision.KeepLocal;
+            }
+            else
+            {
+                diff.Decision = ResolutionDecision.KeepLocal;
+            }
+        }
+    }
+    
+    private void SelectAllServer()
+    {
+        foreach (var diff in Differences)
+        {
+            if (diff.DifferenceType == DifferenceType.NewLocal)
+            {
+                // Bei neuen lokalen Artikeln ist "UseServer" das Verwerfen
+                diff.Decision = ResolutionDecision.UseServer;
+            }
+            else
+            {
+                diff.Decision = ResolutionDecision.UseServer;
+            }
+        }
+    }
+    
+    private void ApplyDecision(ResolutionDecision decision)
+    {
+        if (selectedDifference != null)
+        {
+            selectedDifference.Decision = decision;
+        }
+    }
+    
+    private async Task Cancel()
+    {
+        await BlazoredModal.CancelAsync();
+    }
+    
+    private async Task ConfirmSync()
+    {
+        if (GetUndecidedCount() > 0)
+        {
+            // Es gibt noch unentschiedene Konflikte
+            return;
+        }
+        
+        await BlazoredModal.CloseAsync(ModalResult.Ok(Differences));
+    }
+}

@@ -1,0 +1,34 @@
+@using LagerClient.Blazor.Shared.Models
+@inject LagerClient.Blazor.Client.Services.ModalServiceWrapper ModalService
+
+<div class="modal-content">
+    <div class="modal-header">
+        <h5 class="modal-title">@Title</h5>
+        <button type="button" class="btn-close" @onclick="Close"></button>
+    </div>
+    <div class="modal-body">
+        <p>@ContentText</p>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" @onclick="Close">Abbrechen</button>
+        <button type="button" class="btn btn-@Color" @onclick="Confirm">@ButtonText</button>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter] BlazoredModalInstance BlazoredModal { get; set; } = default!;
+    [Parameter] public string Title { get; set; } = "Bestätigung";
+    [Parameter] public string ContentText { get; set; } = "Sind Sie sicher?";
+    [Parameter] public string ButtonText { get; set; } = "Bestätigen";
+    [Parameter] public string Color { get; set; } = "primary";
+
+    private async Task Close()
+    {
+        await BlazoredModal.CancelAsync();
+    }
+
+    private async Task Confirm()
+    {
+        await BlazoredModal.CloseAsync();
+    }
+}

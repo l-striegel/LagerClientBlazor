@@ -1,0 +1,40 @@
+@using LagerClient.Blazor.Shared.Models
+@inject LagerClient.Blazor.Client.Services.ModalServiceWrapper ModalService
+
+<div class="modal-content">
+    <div class="modal-header">
+        <h5 class="modal-title">@Title</h5>
+        <button type="button" class="btn-close" @onclick="Cancel"></button>
+    </div>
+    <div class="modal-body">
+        <p>@ContentText</p>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" @onclick="Cancel">Abbrechen</button>
+        <button type="button" class="btn btn-danger" @onclick="Discard">Lokale Änderungen verwerfen</button>
+        <button type="button" class="btn btn-primary" @onclick="Sync">Synchronisieren</button>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter] BlazoredModalInstance BlazoredModal { get; set; } = default!;
+    [Parameter] public string Title { get; set; } = "Synchronisierung";
+    [Parameter] public string ContentText { get; set; } = "Möchten Sie Ihre lokalen Änderungen synchronisieren?";
+
+    public enum SyncOption { Cancel, Discard, Sync }
+
+    private async Task Cancel()
+    {
+        await BlazoredModal.CloseAsync(ModalResult.Ok(SyncOption.Cancel));
+    }
+
+    private async Task Discard()
+    {
+        await BlazoredModal.CloseAsync(ModalResult.Ok(SyncOption.Discard));
+    }
+
+    private async Task Sync()
+    {
+        await BlazoredModal.CloseAsync(ModalResult.Ok(SyncOption.Sync));
+    }
+}

@@ -1,0 +1,8 @@
+<Project>
+  <ItemGroup>
+    <Compile Remove="Disabled\**" />
+    <Content Remove="Disabled\**" />
+    <EmbeddedResource Remove="Disabled\**" />
+    <None Remove="Disabled\**" />
+  </ItemGroup>
+</Project>

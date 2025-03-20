@@ -1,0 +1,959 @@
+@page "/"
+@implements IDisposable
+@using LagerClient.Blazor.Shared.Models
+@using LagerClient.Blazor.Client.Services
+@using System.Text.Json
+@inject IOfflineArticleService ArticleService
+@inject IAppConfigService ConfigService
+@inject NavigationManager NavigationManager
+@inject LagerClient.Blazor.Client.Services.ModalServiceWrapper ModalService
+@inject Blazored.Toast.Services.IToastService ToastService
+@inject IJSRuntime JSRuntime
+@inject AppStateService AppState
+@inject IDataExportImportService ExportImportService
+@using Microsoft.AspNetCore.Components.Web
+
+<div class="container-fluid">
+    <h1>LagerClient - Artikelverwaltung</h1>
+    
+    @if (dataIntegrityWarning)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <strong>Achtung!</strong> Die gespeicherten Offline-Daten wurden möglicherweise manipuliert.
+            <button type="button" class="btn-close" @onclick="DismissIntegrityWarning" aria-label="Schließen"></button>
+        </div>
+    }
+    
+    <div class="row mb-3 g-2">
+        <div class="col-md-6">
+            <div class="input-group">
+                <input type="text" class="form-control" placeholder="Suchen..." @bind="searchTerm" @bind:event="oninput" />
+            </div>
+        </div>
+        <div class="col-md-6 d-flex gap-2 justify-content-md-end mt-2 mt-md-0">
+            <button class="btn btn-primary" @onclick="AddNewArticle">
+                <i class="oi oi-plus"></i> Neuer Artikel
+            </button>
+            <button class="btn @(ArticleService.IsOnline ? "btn-success" : "btn-warning")" @onclick="SyncWithBackend">
+                <i class="oi oi-loop-circular"></i> @(ArticleService.IsOnline ? "Online" : "Offline")
+            </button>
+        </div>
+    </div>
+
+    @if (loading)
+    {
+        <div class="d-flex justify-content-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Wird geladen...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row mb-3">
+            <!-- Formatierungs-Toolbar als Komponente -->
+            <div class="col-md-6">
+                <CellFormattingToolbar 
+                    SelectedCells="selectedCells"
+                    SingleSelectedArticle="selectedArticle"
+                    SingleSelectedProperty="selectedProperty"
+                    IsDebugMode="isDebugMode"
+                    ShowSelectedCellInfo="isDebugMode"
+                    OnFormatApplied="LoadArticles"
+                    OnEditRequested="() => StartEditing(selectedArticle, selectedProperty)" />
+            </div>
+                
+            <div class="col-md-6 text-md-end mt-2 mt-md-0">
+                <button class="btn btn-outline-primary me-2" @onclick="ExportData">
+                    <i class="oi oi-data-transfer-download"></i> Als JSON exportieren
+                </button>
+                <button class="btn btn-outline-secondary" @onclick="ImportData">
+                    <i class="oi oi-data-transfer-upload"></i> Aus JSON importieren
+                </button>
+            </div>
+        </div>
+
+        @if (articles == null || !articles.Any())
+        {
+            <div class="alert alert-info">
+                Keine Artikel gefunden.
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover table-striped" style="@zebraStyle">
+                    <thead>
+                        <tr>
+                            <th @onclick="@(() => SortBy("Id"))">
+                                ID @GetSortIcon("Id")
+                            </th>
+                            <th @onclick="@(() => SortBy("Name"))">
+                                Name @GetSortIcon("Name")
+                            </th>
+                            <th @onclick="@(() => SortBy("Type"))">
+                                Typ @GetSortIcon("Type")
+                            </th>
+                            <th @onclick="@(() => SortBy("Stock"))">
+                                Bestand @GetSortIcon("Stock")
+                            </th>
+                            <th @onclick="@(() => SortBy("Unit"))">
+                                Einheit @GetSortIcon("Unit")
+                            </th>
+                            <th @onclick="@(() => SortBy("Price"))">
+                                Preis (€) @GetSortIcon("Price")
+                            </th>
+                            <th @onclick="@(() => SortBy("Location"))">
+                                Lagerplatz @GetSortIcon("Location")
+                            </th>
+                            <th @onclick="@(() => SortBy("Status"))">
+                                Status @GetSortIcon("Status")
+                            </th>
+                            <th @onclick="@(() => SortBy("Link"))">
+                                Link @GetSortIcon("Link")
+                            </th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var article in filteredArticles)
+                        {
+                            <tr>
+                                <td @onclick="@(e => SelectCell(article, "Id", e))" 
+                                    class="@GetCellClass(article, "Id")">
+                                    @article.Id
+                                </td>
+                                <td @onclick="@(e => SelectCell(article, "Name", e))" 
+                                    class="@GetCellClass(article, "Name")"
+                                    style="@GetCellStyle("Name", article)">
+                                    @if (IsEditingCell(article, "Name"))
+                                    {
+                                        <input @bind="article.Name" @bind:event="oninput" 
+                                            @onblur="@(() => SaveEdit(article))" 
+                                            @onkeydown="OnKeyDown"
+                                            class="form-control form-control-sm" 
+                                            style="min-width: 100px;" 
+                                            @ref="editInputReference" />
+                                    }
+                                    else
+                                    {
+                                        <div class="d-flex align-items-center">
+                                            <span class="me-auto">@article.Name</span>
+                                            <i class="oi oi-pencil edit-icon" @onclick:stopPropagation="true" @onclick="@(() => StartEditing(article, "Name"))"></i>
+                                        </div>
+                                    }
+                                </td>
+                                <td @onclick="@(e => SelectCell(article, "Type", e))" 
+                                    class="@GetCellClass(article, "Type")"
+                                    style="@GetCellStyle("Type", article)">
+                                    @if (IsEditingCell(article, "Type"))
+                                    {
+                                        <input @bind="article.Type" @bind:event="oninput" 
+                                            @onblur="@(() => SaveEdit(article))" 
+                                            @onkeydown="OnKeyDown"
+                                            class="form-control form-control-sm" 
+                                            @ref="editInputReference" />
+                                    }
+                                    else
+                                    {
+                                        <div class="d-flex align-items-center">
+                                            <span class="me-auto">@article.Type</span>
+                                            <i class="oi oi-pencil edit-icon" @onclick:stopPropagation="true" @onclick="@(() => StartEditing(article, "Type"))"></i>
+                                        </div>
+                                    }
+                                </td>
+                                <td @onclick="@(e => SelectCell(article, "Stock", e))" 
+                                    class="@GetCellClass(article, "Stock")"
+                                    style="@GetCellStyle("Stock", article)">
+                                    @if (IsEditingCell(article, "Stock"))
+                                    {
+                                        <input type="number" @bind="article.Stock" @bind:event="oninput" 
+                                            @onblur="@(() => SaveEdit(article))" 
+                                            @onkeydown="OnKeyDown"
+                                            class="form-control form-control-sm" 
+                                            @ref="editInputReference" />
+                                    }
+                                    else
+                                    {
+                                        <div class="d-flex align-items-center">
+                                            <span class="me-auto">@article.Stock</span>
+                                            <i class="oi oi-pencil edit-icon" @onclick:stopPropagation="true" @onclick="@(() => StartEditing(article, "Stock"))"></i>
+                                        </div>
+                                    }
+                                </td>
+                                <td @onclick="@(e => SelectCell(article, "Unit", e))" 
+                                    class="@GetCellClass(article, "Unit")"
+                                    style="@GetCellStyle("Unit", article)">
+                                    @if (IsEditingCell(article, "Unit"))
+                                    {
+                                        <input @bind="article.Unit" @bind:event="oninput" 
+                                            @onblur="@(() => SaveEdit(article))" 
+                                            @onkeydown="OnKeyDown"
+                                            class="form-control form-control-sm" 
+                                            @ref="editInputReference" />
+                                    }
+                                    else
+                                    {
+                                        <div class="d-flex align-items-center">
+                                            <span class="me-auto">@article.Unit</span>
+                                            <i class="oi oi-pencil edit-icon" @onclick:stopPropagation="true" @onclick="@(() => StartEditing(article, "Unit"))"></i>
+                                        </div>
+                                    }
+                                </td>
+                                <td @onclick="@(e => SelectCell(article, "Price", e))" 
+                                    class="@GetCellClass(article, "Price")"
+                                    style="@GetCellStyle("Price", article)">
+                                    @if (IsEditingCell(article, "Price"))
+                                    {
+                                        <input type="number" step="0.01" @bind="article.Price" @bind:event="oninput" 
+                                            @onblur="@(() => SaveEdit(article))" 
+                                            @onkeydown="OnKeyDown"
+                                            class="form-control form-control-sm" 
+                                            @ref="editInputReference" />
+                                    }
+                                    else
+                                    {
+                                        <div class="d-flex align-items-center">
+                                            <span class="me-auto">@article.Price.ToString("C")</span>
+                                            <i class="oi oi-pencil edit-icon" @onclick:stopPropagation="true" @onclick="@(() => StartEditing(article, "Price"))"></i>
+                                        </div>
+                                    }
+                                </td>
+                                <td @onclick="@(e => SelectCell(article, "Location", e))" 
+                                    class="@GetCellClass(article, "Location")"
+                                    style="@GetCellStyle("Location", article)">
+                                    @if (IsEditingCell(article, "Location"))
+                                    {
+                                        <input @bind="article.Location" @bind:event="oninput" 
+                                            @onblur="@(() => SaveEdit(article))" 
+                                            @onkeydown="OnKeyDown"
+                                            class="form-control form-control-sm" 
+                                            @ref="editInputReference" />
+                                    }
+                                    else
+                                    {
+                                        <div class="d-flex align-items-center">
+                                            <span class="me-auto">@article.Location</span>
+                                            <i class="oi oi-pencil edit-icon" @onclick:stopPropagation="true" @onclick="@(() => StartEditing(article, "Location"))"></i>
+                                        </div>
+                                    }
+                                </td>
+                                <td @onclick="@(e => SelectCell(article, "Status", e))" 
+                                    class="@GetCellClass(article, "Status")"
+                                    style="@GetCellStyle("Status", article)">
+                                    @if (IsEditingCell(article, "Status"))
+                                    {
+                                        <select @bind="article.Status" @bind:event="oninput" 
+                                                @onblur="@(() => SaveEdit(article))" 
+                                                @onkeydown="OnKeyDown"
+                                                class="form-select form-select-sm" 
+                                                @ref="editInputReference">
+                                            <option value="Auf Lager">Auf Lager</option>
+                                            <option value="Bestellt">Bestellt</option>
+                                            <option value="Nicht verfügbar">Nicht verfügbar</option>
+                                        </select>
+                                    }
+                                    else
+                                    {
+                                        <div class="d-flex align-items-center">
+                                            <span class="me-auto">@article.Status</span>
+                                            <i class="oi oi-pencil edit-icon" @onclick:stopPropagation="true" @onclick="@(() => StartEditing(article, "Status"))"></i>
+                                        </div>
+                                    }
+                                </td>
+                                <td @onclick="@(e => SelectCell(article, "Link", e))" 
+                                    class="@GetCellClass(article, "Link")"
+                                    style="@GetCellStyle("Link", article)">
+                                    @if (IsEditingCell(article, "Link"))
+                                    {
+                                        <div>
+                                            <input @bind="article.Link" @bind:event="oninput" 
+                                                @onblur="@(() => SaveEditWithValidation(article))" 
+                                                @onkeydown="OnKeyDown"
+                                                class="form-control form-control-sm" 
+                                                placeholder="https://example.com"
+                                                @ref="editInputReference" />
+                                            @if (linkValidationError)
+                                            {
+                                                <small class="text-danger">Bitte geben Sie eine gültige URL ein (muss mit http:// oder https:// beginnen)</small>
+                                            }
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="d-flex align-items-center">
+                                            @if (!string.IsNullOrEmpty(article.Link))
+                                            {
+                                                <a href="@article.Link" target="_blank" @onclick:stopPropagation="true" class="me-2">
+                                                    <i class="oi oi-external-link"></i>
+                                                </a>
+                                                <span class="small text-truncate" title="@article.Link">
+                                                    @article.Link
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="me-auto">-</span>
+                                            }
+                                            <i class="oi oi-pencil edit-icon ms-auto" @onclick:stopPropagation="true" @onclick="@(() => StartEditing(article, "Link"))"></i>
+                                        </div>
+                                    }
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-danger" @onclick="@(() => DeleteArticle(article))">
+                                        <i class="oi oi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private List<Article> articles = new();
+    private List<Article> filteredArticles => ApplyFilters();
+    private bool loading = true;
+    private string searchTerm = string.Empty;
+    private string sortColumn = "Id";
+    private bool sortAscending = true;
+    private bool dataIntegrityWarning = false;
+    private bool linkValidationError = false;
+    private ElementReference editInputReference;
+    private bool isDebugMode = false;
+    private string zebraStyle = "";
+    
+    // Zellauswahl und Bearbeitung
+    private Article? selectedArticle;
+    private string? selectedProperty;
+    private Article? editingArticle;
+    private string? editingProperty;
+    private List<(Article Article, string Property)> selectedCells = new();
+    private bool isShiftKeyPressed = false;
+    private bool isCtrlKeyPressed = false;
+    private (Article Article, string Property)? lastSelectedCell = null;
+    private Action? _settingsChangedCallback;
+    private IDisposable? _configSubscription;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Laden der initialen Konfiguration
+        var config = await ConfigService.GetConfigAsync();
+        Console.WriteLine($"Initial Debug Mode: {config.IsDebugMode}");
+        
+        isDebugMode = config.IsDebugMode;
+        // Beide Styling-Variablen in einem String vereinen
+        zebraStyle = $"--zebra-color: {config.UiSettings.TableZebraColor}; --row-height: {config.UiSettings.TableRowHeight}px;";
+        
+        // Daten laden
+        await LoadArticles();
+        
+        // Abonnieren von Änderungen
+        _configSubscription = AppState.ConfigChanges.Subscribe(updatedConfig =>
+        {
+            Console.WriteLine($"Config Updated - Debug Mode: {updatedConfig.IsDebugMode}");
+            
+            InvokeAsync(() => 
+            {
+                isDebugMode = updatedConfig.IsDebugMode;
+                // Aktualisiere beide Styling-Variablen
+                zebraStyle = $"--zebra-color: {updatedConfig.UiSettings.TableZebraColor}; --row-height: {updatedConfig.UiSettings.TableRowHeight}px;";
+                
+                // Erzwinge UI-Update
+                StateHasChanged();
+                
+                Console.WriteLine($"UI updated - Debug Mode now: {isDebugMode}");
+            });
+        });
+    }
+    // Dispose-Methode zum Abmelden des Events
+    public void Dispose()
+    {
+        // Abonnement korrekt beenden
+        _configSubscription?.Dispose();
+    }
+    private void HandleSettingsChanged()
+    {
+        Console.WriteLine("HandleSettingsChanged called - BEFORE InvokeAsync");
+        InvokeAsync(async () => 
+        {
+            Console.WriteLine("HandleSettingsChanged - INSIDE InvokeAsync");
+            try 
+            {
+                var config = await ConfigService.GetConfigAsync();
+                Console.WriteLine($"Config retrieved: Debug Mode = {config.IsDebugMode}");
+                
+                zebraStyle = $"--zebra-color: {config.UiSettings.TableZebraColor};";
+                isDebugMode = config.IsDebugMode;
+                
+                Console.WriteLine($"HandleSettingsChanged - Updated isDebugMode to {isDebugMode}");
+                
+                // Erzwinge UI-Update
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error in HandleSettingsChanged: {ex.Message}");
+            }
+        });
+    }
+
+    private async Task LoadArticles()
+    {
+        loading = true;
+        try
+        {
+            articles = await ArticleService.GetArticlesAsync();
+            Console.WriteLine($"LoadArticles: Loaded {articles.Count} articles");
+            
+            if (articles.Count == 0)
+            {
+                Console.WriteLine("Warning: No articles returned from service");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error in LoadArticles: {ex.Message}");
+            ToastService.ShowError($"Fehler beim Laden der Artikel: {ex.Message}");
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    // Excel-ähnliche Funktionalität - Zellauswahl
+    private void SelectCell(Article article, string property, MouseEventArgs e)
+    {
+        // Verhindert das Setzen des Fokus auf die Zelle
+        JSRuntime.InvokeVoidAsync("preventCellFocus");
+        
+        // Wenn wir gerade bearbeiten, diese Bearbeitung abschließen
+        if (editingArticle != null && (editingArticle != article || editingProperty != property))
+        {
+            _ = SaveEdit(editingArticle);
+        }
+        
+        // Erfasse Zustände der Tasten
+        isCtrlKeyPressed = e.CtrlKey;
+        isShiftKeyPressed = e.ShiftKey;
+        
+        // Einzelne Zelle für den Fall merken, dass später editiert wird
+        selectedArticle = article;
+        selectedProperty = property;
+        
+        // Mehrfachauswahl-Logik
+        if (isCtrlKeyPressed)
+        {
+            // STRG+Klick: Zelle zur Auswahl hinzufügen/entfernen
+            var existingSelection = selectedCells.FirstOrDefault(c => 
+                c.Article.Id == article.Id && c.Property == property);
+                
+            if (existingSelection != default)
+            {
+                // Bereits ausgewählt -> entfernen
+                selectedCells.RemoveAll(c => 
+                    c.Article.Id == article.Id && c.Property == property);
+            }
+            else
+            {
+                // Neu auswählen
+                selectedCells.Add((article, property));
+                lastSelectedCell = (article, property);
+            }
+        }
+        else if (isShiftKeyPressed && lastSelectedCell.HasValue)
+        {
+            // SHIFT+Klick: Bereich auswählen
+            var (lastArticle, lastProperty) = lastSelectedCell.Value;
+            if (lastArticle != null)
+            {
+                SelectCellRange(lastArticle, lastProperty!, article, property);
+            }
+        }
+        else
+        {
+            // Normaler Klick: Bisherige Auswahl löschen und nur aktuelle Zelle auswählen
+            selectedCells.Clear();
+            selectedCells.Add((article, property));
+            lastSelectedCell = (article, property);
+        }
+        
+        // Doppelklick-Handling für Einzelzellen-Bearbeitung
+        if (e.Detail == 2 && property != "Id")
+        {
+            StartEditing(article, property);
+        }
+    }
+
+    // Hilfsmethode zum Auswählen eines Bereichs:
+    private void SelectCellRange(Article startArticle, string startProperty, 
+                                Article endArticle, string endProperty)
+    {
+        // Finde Indizes in der gefilterten Artikelliste
+        int startArticleIndex = filteredArticles.FindIndex(a => a.Id == startArticle.Id);
+        int endArticleIndex = filteredArticles.FindIndex(a => a.Id == endArticle.Id);
+        
+        // Normalisiere Bereich (stelle sicher, dass Start <= End)
+        if (startArticleIndex > endArticleIndex)
+        {
+            (startArticleIndex, endArticleIndex) = (endArticleIndex, startArticleIndex);
+            (startProperty, endProperty) = (endProperty, startProperty);
+        }
+        
+        // Liste der Properties in der Reihenfolge der Tabellenspalten
+        var properties = new[] { "Id", "Name", "Type", "Stock", "Unit", "Price", "Location", "Status", "Link" };
+        
+        // Finde Property-Indizes
+        int startPropIndex = Array.IndexOf(properties, startProperty);
+        int endPropIndex = Array.IndexOf(properties, endProperty);
+        
+        // Normalisiere Bereich
+        if (startPropIndex > endPropIndex)
+        {
+            (startPropIndex, endPropIndex) = (endPropIndex, startPropIndex);
+        }
+        
+        // Neue Auswahl starten, wenn nicht STRG gedrückt
+        if (!isCtrlKeyPressed)
+        {
+            selectedCells.Clear();
+        }
+        
+        // Wähle alle Zellen im Bereich aus
+        for (int i = startArticleIndex; i <= endArticleIndex; i++)
+        {
+            var article = filteredArticles[i];
+            
+            for (int j = startPropIndex; j <= endPropIndex; j++)
+            {
+                var prop = properties[j];
+                
+                // Überspringe ID-Spalte für Formatierungen
+                if (prop == "Id") continue;
+                
+                // Füge zur Auswahl hinzu, wenn noch nicht vorhanden
+                if (!selectedCells.Any(c => c.Article.Id == article.Id && c.Property == prop))
+                {
+                    selectedCells.Add((article, prop));
+                }
+            }
+        }
+    }
+    
+    private bool IsEditingCell(Article article, string property)
+    {
+        return article == editingArticle && property == editingProperty;
+    }
+    
+    private string GetCellClass(Article article, string property)
+    {
+        bool isSelected = article == selectedArticle && property == selectedProperty;
+        bool isMultiSelected = selectedCells.Any(c => c.Article.Id == article.Id && c.Property == property);
+        bool isEditing = IsEditingCell(article, property);
+        
+        var classes = new List<string>();
+        
+        if (isMultiSelected)
+            classes.Add("multi-selected-cell");
+            
+        if (isSelected)
+            classes.Add("selected-cell");
+            
+        if (isEditing)
+            classes.Add("editing-cell");
+        
+        return string.Join(" ", classes);
+    }
+    
+    private async Task StartEditing(Article? article, string? property)
+    {
+        if (article == null || property == null || property == "Id") return;
+        
+        // Wenn wir bereits eine andere Zelle bearbeiten, diese zuerst speichern
+        if (editingArticle != null && (editingArticle != article || editingProperty != property))
+        {
+            await SaveEdit(editingArticle);
+        }
+        
+        editingArticle = article;
+        editingProperty = property;
+        selectedArticle = article;
+        selectedProperty = property;
+        
+        // Reset Link-Validierungsfehler
+        linkValidationError = false;
+        
+        // Focus auf das Input-Feld setzen
+        await Task.Delay(10); // Kurze Verzögerung, damit das DOM aktualisiert werden kann
+        await FocusInputElement();
+    }
+    
+    private async Task FocusInputElement()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("focusElement", editInputReference);
+        }
+        catch
+        {
+            // Ignore errors, element might not be rendered yet
+        }
+    }
+    
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && editingArticle != null)
+        {
+            // Bei Link-Feld validieren
+            if (editingProperty == "Link")
+            {
+                _ = SaveEditWithValidation(editingArticle);
+            }
+            else
+            {
+                _ = SaveEdit(editingArticle);
+            }
+        }
+        else if (e.Key == "Escape")
+        {
+            CancelEditing();
+        }
+    }
+    
+    private void CancelEditing()
+    {
+        editingArticle = null;
+        editingProperty = null;
+        linkValidationError = false;
+        StateHasChanged();
+    }
+    
+    private async Task SaveEditWithValidation(Article article)
+    {
+        if (editingProperty == "Link" && !string.IsNullOrEmpty(article.Link))
+        {
+            // Link-Validierung
+            if (!IsValidUrl(article.Link))
+            {
+                linkValidationError = true;
+                return;
+            }
+        }
+        
+        linkValidationError = false;
+        await SaveEdit(article);
+    }
+    
+    private bool IsValidUrl(string url)
+    {
+        return url.StartsWith("http://") || url.StartsWith("https://");
+    }
+    
+    private async Task SaveEdit(Article article)
+    {
+        if (editingArticle != null)
+        {
+            try
+            {
+                // Serialisiere die Styles mit der richtigen Option
+                var jsonOptions = new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = null, // Keine Namensänderung, behält PascalCase bei
+                    WriteIndented = false
+                };
+                
+                article.StylesJson = JsonSerializer.Serialize(article.Styles, jsonOptions);
+                
+                // Speichere den Artikel
+                await ArticleService.SaveArticleAsync(article);
+                ToastService.ShowSuccess("Änderungen gespeichert");
+            }
+            catch (Exception ex)
+            {
+                ToastService.ShowError($"Fehler beim Speichern: {ex.Message}");
+            }
+            
+            // Bearbeitung beenden
+            editingArticle = null;
+            editingProperty = null;
+        }
+    }
+    
+    private string GetCellStyle(string property, Article article)
+    {
+        if (article.Styles.TryGetValue(property, out var style))
+        {
+            var styleString = "";
+            
+            if (style.Bold)
+                styleString += "font-weight: bold; ";
+                
+            if (style.Italic)
+                styleString += "font-style: italic; ";
+                                
+            if (!string.IsNullOrEmpty(style.Color))
+                styleString += $"color: {style.Color}; ";
+                
+            return styleString;
+        }
+        
+        return string.Empty;
+    }
+
+    private async Task ExportData()
+    {
+        await ExportImportService.ExportDataToJson();
+    }
+
+private async Task ImportData()
+{
+    var importedArticles = await ExportImportService.ImportDataFromJson();
+    if (importedArticles != null && importedArticles.Count > 0)
+    {
+        // Direkte Offline-Aktivierung
+        if (ArticleService is OfflineArticleService offlineService)
+        {
+            offlineService.IsOnline = false;
+            Console.WriteLine($"Direkt in Index: Offline-Status gesetzt: {!offlineService.IsOnline}");
+        }
+        await LoadArticles();
+        // Explizite UI-Aktualisierung
+        StateHasChanged();
+    }
+}
+
+    private async Task CheckDataIntegrity()
+    {
+        if (!ArticleService.IsOnline)
+        {
+            var isValid = await ArticleService.VerifyDataIntegrityAsync();
+            dataIntegrityWarning = !isValid;
+            
+            if (dataIntegrityWarning)
+            {
+                ToastService.ShowWarning("Die Offline-Daten wurden möglicherweise manipuliert!");
+            }
+        }
+        else
+        {
+            dataIntegrityWarning = false;
+        }
+    }
+
+    private void DismissIntegrityWarning()
+    {
+        dataIntegrityWarning = false;
+    }
+
+    private List<Article> ApplyFilters()
+    {
+        var filtered = articles;
+        
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var lowerSearch = searchTerm.ToLower();
+            filtered = filtered
+                .Where(a => a.Name.ToLower().Contains(lowerSearch) ||
+                           a.Type.ToLower().Contains(lowerSearch) ||
+                           a.Location.ToLower().Contains(lowerSearch) ||
+                           a.Status.ToLower().Contains(lowerSearch))
+                .ToList();
+        }
+        
+        return SortArticles(filtered);
+    }
+
+    private List<Article> SortArticles(List<Article> articlesToSort)
+    {
+        return sortColumn switch
+        {
+            "Id" => sortAscending ? articlesToSort.OrderBy(a => a.Id).ToList() : articlesToSort.OrderByDescending(a => a.Id).ToList(),
+            "Name" => sortAscending ? articlesToSort.OrderBy(a => a.Name).ToList() : articlesToSort.OrderByDescending(a => a.Name).ToList(),
+            "Type" => sortAscending ? articlesToSort.OrderBy(a => a.Type).ToList() : articlesToSort.OrderByDescending(a => a.Type).ToList(),
+            "Stock" => sortAscending ? articlesToSort.OrderBy(a => a.Stock).ToList() : articlesToSort.OrderByDescending(a => a.Stock).ToList(),
+            "Unit" => sortAscending ? articlesToSort.OrderBy(a => a.Unit).ToList() : articlesToSort.OrderByDescending(a => a.Unit).ToList(),
+            "Price" => sortAscending ? articlesToSort.OrderBy(a => a.Price).ToList() : articlesToSort.OrderByDescending(a => a.Price).ToList(),
+            "Location" => sortAscending ? articlesToSort.OrderBy(a => a.Location).ToList() : articlesToSort.OrderByDescending(a => a.Location).ToList(),
+            "Status" => sortAscending ? articlesToSort.OrderBy(a => a.Status).ToList() : articlesToSort.OrderByDescending(a => a.Status).ToList(),
+            "Link" => sortAscending ? articlesToSort.OrderBy(a => a.Link).ToList() : articlesToSort.OrderByDescending(a => a.Link).ToList(),
+            _ => articlesToSort
+        };
+    }
+
+    private void SortBy(string column)
+    {
+        if (sortColumn == column)
+        {
+            sortAscending = !sortAscending;
+        }
+        else
+        {
+            sortColumn = column;
+            sortAscending = true;
+        }
+    }
+
+    private string GetSortIcon(string column)
+    {
+        if (sortColumn != column)
+            return string.Empty;
+            
+        return sortAscending ? "↑" : "↓";
+    }
+
+    private async Task SyncWithBackend()
+    {
+        loading = true;
+        try
+        {
+            // Prüfen, ob wir von Offline zu Online wechseln würden
+            bool isCurrentlyOffline = !ArticleService.IsOnline;
+            
+            if (isCurrentlyOffline)
+            {
+                // Hole lokale und Server-Artikel
+                var localArticles = await ArticleService.GetArticlesAsync();
+                
+                // Versuche, Server-Artikel zu laden (kann fehlschlagen, wenn keine Verbindung)
+                List<Article> serverArticles;
+                try
+                {
+                    // Verwende die neue Methode, um Server-Artikel zu holen ohne den Cache zu aktualisieren
+                    var offlineService = (OfflineArticleService)ArticleService;
+                    serverArticles = await offlineService.GetServerArticlesAsync();
+                }
+                catch (Exception ex)
+                {
+                    ToastService.ShowError($"Keine Verbindung zum Server möglich: {ex.Message}");
+                    loading = false;
+                    return;
+                }
+                
+                // Vergleiche Artikel und finde Unterschiede
+                var comparisonService = new ArticleComparisonService();
+                var differences = comparisonService.CompareArticles(localArticles, serverArticles);
+                
+                // Wenn es keine Unterschiede gibt, führe einfache Synchronisierung durch
+                if (differences.Count == 0)
+                {
+                    await ArticleService.SyncWithBackendAsync();
+                    await LoadArticles();
+                    ToastService.ShowSuccess("Synchronisierung erfolgreich. Keine Unterschiede gefunden.");
+                    loading = false;
+                    return;
+                }
+                
+                // Bei Unterschieden zeige den Synchronisierungsdialog
+                var parameters = new Blazored.Modal.ModalParameters();
+                parameters.Add("Differences", differences);
+                
+                var options = new Blazored.Modal.ModalOptions()
+                {
+                    Size = Blazored.Modal.ModalSize.Large
+                };
+                
+                var formModal = ModalService.Show<SyncResolutionModal>("Synchronisierungskonflikte", parameters, options);
+                var result = await formModal.Result;
+                
+                if (result.Cancelled)
+                {
+                    // Der Benutzer hat den Dialog abgebrochen
+                    loading = false;
+                    return;
+                }
+                
+                // Verarbeite die Entscheidungen
+                if (result.Data is List<ArticleDifference> resolutions)
+                {
+                    // Verwende die neue Methode zur detaillierten Synchronisierung
+                    var offlineService = (OfflineArticleService)ArticleService;
+                    bool success = await offlineService.SyncWithResolutionAsync(resolutions);
+                    
+                    if (success)
+                    {
+                        await LoadArticles();
+                        ToastService.ShowSuccess("Synchronisierung erfolgreich abgeschlossen.");
+                    }
+                    else
+                    {
+                        ToastService.ShowError("Fehler bei der Synchronisierung. Bitte versuchen Sie es erneut.");
+                    }
+                }
+            }
+            else
+            {
+                // Wir sind bereits online, führe normale Synchronisierung durch
+                await ArticleService.SyncWithBackendAsync();
+                await LoadArticles();
+                ToastService.ShowSuccess("Synchronisierung erfolgreich.");
+            }
+            
+            await CheckDataIntegrity();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Fehler bei der Synchronisierung: {ex.Message}");
+            Console.Error.WriteLine($"Stack trace: {ex.StackTrace}");
+            ToastService.ShowError($"Fehler bei der Synchronisierung: {ex.Message}");
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void AddNewArticle()
+    {
+        var parameters = new Blazored.Modal.ModalParameters();
+        parameters.Add("Article", new Article());
+        parameters.Add("OnArticleSaved", EventCallback.Factory.Create<Article>(this, HandleArticleSaved));
+        var options = new Blazored.Modal.ModalOptions
+        {
+            Size = Blazored.Modal.ModalSize.Medium
+        };
+        
+        ModalService.Show<ArticleEditModal>("Neuer Artikel", parameters, options);
+    }
+
+    private async Task HandleArticleSaved(Article savedArticle)
+    {
+        // Tabelle neu laden
+        await LoadArticles();
+    }
+
+    private async Task DeleteArticle(Article article)
+    {
+        var parameters = new Blazored.Modal.ModalParameters();
+        parameters.Add("ContentText", $"Möchten Sie den Artikel '{article.Name}' wirklich löschen?");
+        parameters.Add("ButtonText", "Löschen");
+        parameters.Add("Color", "danger");
+        
+        var options = new Blazored.Modal.ModalOptions();
+        var formModal = ModalService.Show<ConfirmationModal>("Artikel löschen", parameters, options);
+        var result = await formModal.Result;
+        
+        if (!result.Cancelled)
+        {
+            loading = true;
+            try
+            {
+                await ArticleService.DeleteArticleAsync(article.Id);
+                await LoadArticles();
+                ToastService.ShowSuccess("Artikel erfolgreich gelöscht.");
+            }
+            catch (Exception ex)
+            {
+                ToastService.ShowError($"Fehler beim Löschen: {ex.Message}");
+            }
+            finally
+            {
+                loading = false;
+            }
+        }
+    }    
+}
