@@ -1,8 +1,10 @@
 # LagerClient Blazor - Artikelverwaltung
 Eine moderne Blazor WebAssembly-Anwendung zur Verwaltung von Lagerartikeln mit Excel-ähnlicher Bearbeitung, Offline-Fähigkeit und reaktivem State-Management.
+
 ![.NET Version](https://img.shields.io/badge/.NET-8.0-purple)
 ![Status](https://img.shields.io/badge/Status-Stable-green)
 ![Version](https://img.shields.io/badge/Version-1.0.0-blue)
+
 ## Features
 - **Excel-ähnliche Tabellendarstellung**: Inline-Bearbeitung mit Tastatur-Navigation
 - **Zellformatierung**: Mehrfachauswahl von Zellen (STRG+Klick, SHIFT+Klick) zum Formatieren (Fett, Kursiv, Farbe)
