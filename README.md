@@ -5,7 +5,7 @@ Eine moderne Blazor WebAssembly-Anwendung zur Verwaltung von Lagerartikeln mit E
 ![.NET Version](https://img.shields.io/badge/.NET-8.0-purple)
 ![Status](https://img.shields.io/badge/Status-Stable-green)
 ![Version](https://img.shields.io/badge/Version-1.0.0-blue)
-![Build Status](https://github.com/l-striegel/LagerClient-Blazor/actions/workflows/ci.yml/badge.svg)
+![Build Status](https://github.com/l-striegel/LagerClientBlazor/actions/workflows/ci.yml/badge.svg)
 
 ## Features
 
