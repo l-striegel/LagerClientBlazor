@@ -8,6 +8,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v3
       
@@ -26,26 +28,21 @@ jobs:
       - name: Publish
         run: dotnet publish Client/Client.csproj -c Release -o release --nologo
       
-      # Die folgenden Schritte bleiben gleich
+      # Füge .nojekyll-Datei hinzu, um Jekyll-Verarbeitung zu deaktivieren
       - name: Add .nojekyll file
         run: touch release/wwwroot/.nojekyll
       
+      # Ändere die base-href für GitHub Pages
       - name: Change base-href in index.html
         run: sed -i 's/<base href="\/" \/>/<base href="\/LagerClientBlazor\/" \/>/g' release/wwwroot/index.html
       
+      # Kopiere index.html zu 404.html, damit Routing funktioniert
       - name: Copy index.html to 404.html
         run: cp release/wwwroot/index.html release/wwwroot/404.html
       
-      - name: Prepare docs directory
-        run: |
-          rm -rf docs
-          mkdir -p docs
-          cp -r release/wwwroot/* docs/
-      
-      - name: Commit and push changes
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add docs
-          git commit -m "Update GitHub Pages" || echo "No changes to commit"
-          git push
+      # Deployment auf GitHub Pages
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./release/wwwroot
