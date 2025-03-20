@@ -1,0 +1,188 @@
+{
+            "data": [{
+                "Id": 1,
+                "Name": "LED-Streifen",
+                "Type": "Elektronik",
+                "Stock": 10,
+                "Unit": "Stück",
+                "Price": 5.99,
+                "Location": "Regal 2",
+                "Status": "Auf Lager",
+                "Link": "https://example.com",
+                "Timestamp": "2025-03-18T12:55:51",
+                "StylesJson": "{\"Name\":{\"Bold\":true,\"Italic\":false,\"Underline\":false,\"Color\":\"#ed2c2c\"},\"Location\":{\"Bold\":true,\"Italic\":false,\"Underline\":false,\"Color\":\"#000000\"}}",
+                "Styles": {
+        "Name": {
+          "Bold": true,
+          "Italic": false,
+          "Color": "#ed2c2c"
+        },
+        "Location": {
+          "Bold": true,
+          "Italic": false,
+          "Color": "#000000"
+        }
+      }
+                },
+{
+                "Id": 4,
+                "Name": "LED-Halter",
+                "Type": "Elektronik",
+                "Stock": 4,
+                "Unit": "Stück",
+                "Price": 0.3,
+                "Location": "R1B2",
+                "Status": "Auf Lager",
+                "Link": "https://www.aliexpress.de",
+                "Timestamp": "2025-03-08T09:55:51",
+                "StylesJson": "{\"Name\":{\"Bold\":false,\"Italic\":false,\"Underline\":false,\"Color\":\"#000000\"}}",
+                "Styles": {
+        "Name": {
+          "Bold": false,
+          "Italic": false,
+          "Color": "#000000"
+        }
+      }
+                },
+{
+                "Id": 5,
+                "Name": "Neuer Artikel",
+                "Type": "Elektronik",
+                "Stock": 1,
+                "Unit": "Stück",
+                "Price": 18.93,
+                "Location": "Regal 2",
+                "Status": "Auf Lager",
+                "Link": "https://www.test.de",
+                "Timestamp": "2025-03-08T12:04:37",
+                "StylesJson": "{\"Name\":{\"Bold\":false,\"Italic\":false,\"Underline\":false,\"Color\":\"#000000\"}}",
+                "Styles": {
+        "Name": {
+          "Bold": false,
+          "Italic": false,
+          "Color": "#000000"
+        }
+      }
+                },
+{
+                "Id": 7,
+                "Name": "Diode",
+                "Type": "Elektronik",
+                "Stock": 14,
+                "Unit": "Stück",
+                "Price": 5.0,
+                "Location": "Regal 1 Box 2",
+                "Status": "Auf Lager",
+                "Link": "https://www.amazon.de",
+                "Timestamp": "2025-03-09T09:25:18",
+                "StylesJson": "{\"Name\":{\"Bold\":true,\"Italic\":false,\"Underline\":false,\"Color\":\"#000000\"}}",
+                "Styles": {
+        "Name": {
+          "Bold": true,
+          "Italic": false,
+          "Color": "#000000"
+        }
+      }
+                },
+{
+                "Id": 6,
+                "Name": "Relais",
+                "Type": "Elektronik",
+                "Stock": 1,
+                "Unit": "Stück",
+                "Price": 17.95,
+                "Location": "Regal 1",
+                "Status": "Auf Lager",
+                "Link": "http://test.de",
+                "Timestamp": "2025-03-09T09:38:11",
+                "StylesJson": "{\"Name\":{\"Bold\":false,\"Italic\":false,\"Underline\":false,\"Color\":\"#000000\"}}",
+                "Styles": {
+        "Name": {
+          "Bold": false,
+          "Italic": false,
+          "Color": "#000000"
+        }
+      }
+                },
+{
+                "Id": 2,
+                "Name": "Testartikel",
+                "Type": "Elektronik",
+                "Stock": 10,
+                "Unit": "Stück",
+                "Price": 9.99,
+                "Location": "Regal 5",
+                "Status": "Auf Lager",
+                "Link": "https://test.com",
+                "Timestamp": "2025-03-08T12:05:49",
+                "StylesJson": "{\"Name\":{\"Bold\":true,\"Italic\":false,\"Underline\":false,\"Color\":\"#000000\"},\"Typ\":{\"Bold\":false,\"Italic\":false,\"Underline\":false,\"Color\":\"#000000\"},\"Status\":{\"Bold\":false,\"Italic\":false,\"Underline\":false,\"Color\":\"#000000\"},\"Link\":{\"Bold\":false,\"Italic\":false,\"Underline\":false,\"Color\":\"#000000\"},\"Bestand\":{\"Bold\":false,\"Italic\":false,\"Underline\":false,\"Color\":\"#000000\"},\"Einheit\":{\"Bold\":false,\"Italic\":false,\"Underline\":false,\"Color\":\"#000000\"},\"Preis (\\u20AC)\":{\"Bold\":true,\"Italic\":false,\"Underline\":false,\"Color\":\"#000000\"},\"Lagerplatz\":{\"Bold\":false,\"Italic\":false,\"Underline\":false,\"Color\":\"#000000\"},\"Type\":{\"Bold\":false,\"Italic\":false,\"Underline\":false,\"Color\":\"#000000\"},\"Stock\":{\"Bold\":false,\"Italic\":false,\"Underline\":false,\"Color\":\"#000000\"},\"Unit\":{\"Bold\":false,\"Italic\":false,\"Underline\":false,\"Color\":\"#000000\"},\"Price\":{\"Bold\":false,\"Italic\":false,\"Underline\":false,\"Color\":\"#000000\"},\"Location\":{\"Bold\":true,\"Italic\":false,\"Underline\":false,\"Color\":\"#000000\"}}",
+                "Styles": {
+        "Name": {
+          "Bold": true,
+          "Italic": false,
+          "Color": "#000000"
+        },
+        "Typ": {
+          "Bold": false,
+          "Italic": false,
+          "Color": "#000000"
+        },
+        "Status": {
+          "Bold": false,
+          "Italic": false,
+          "Color": "#000000"
+        },
+        "Link": {
+          "Bold": false,
+          "Italic": false,
+          "Color": "#000000"
+        },
+        "Bestand": {
+          "Bold": false,
+          "Italic": false,
+          "Color": "#000000"
+        },
+        "Einheit": {
+          "Bold": false,
+          "Italic": false,
+          "Color": "#000000"
+        },
+        "Preis (€)": {
+          "Bold": true,
+          "Italic": false,
+          "Color": "#000000"
+        },
+        "Lagerplatz": {
+          "Bold": false,
+          "Italic": false,
+          "Color": "#000000"
+        },
+        "Type": {
+          "Bold": false,
+          "Italic": false,
+          "Color": "#000000"
+        },
+        "Stock": {
+          "Bold": false,
+          "Italic": false,
+          "Color": "#000000"
+        },
+        "Unit": {
+          "Bold": false,
+          "Italic": false,
+          "Color": "#000000"
+        },
+        "Price": {
+          "Bold": false,
+          "Italic": false,
+          "Color": "#000000"
+        },
+        "Location": {
+          "Bold": true,
+          "Italic": false,
+          "Color": "#000000"
+        }
+      }
+                }],
+            "hash": "Jo68EwLUA09qcAsAUoU1Z7jNonpQ64FmAQgYO3RbPkk="
+            }
