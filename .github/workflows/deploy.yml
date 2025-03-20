@@ -1,0 +1,54 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 8.0.x
+      
+      - name: Restore dependencies
+        run: dotnet restore LagerClient.Blazor/LagerClient.Blazor.sln
+      
+      - name: Build
+        run: dotnet build LagerClient.Blazor/LagerClient.Blazor.sln --no-restore --configuration Release
+      
+      - name: Publish
+        run: dotnet publish LagerClient.Blazor/Client/Client.csproj -c Release -o release --nologo
+      
+      # Füge .nojekyll-Datei hinzu, um Jekyll-Verarbeitung zu deaktivieren
+      - name: Add .nojekyll file
+        run: touch release/wwwroot/.nojekyll
+      
+      # Ändere die base-href für GitHub Pages
+      - name: Change base-href in index.html
+        run: sed -i 's/<base href="\/" \/>/<base href="\/LagerClientBlazor\/" \/>/g' release/wwwroot/index.html
+      
+      # Kopiere index.html zu 404.html, damit Routing funktioniert
+      - name: Copy index.html to 404.html
+        run: cp release/wwwroot/index.html release/wwwroot/404.html
+      
+      # Kopiere die generierten Dateien in den docs-Ordner
+      - name: Prepare docs directory
+        run: |
+          rm -rf docs
+          mkdir -p docs
+          cp -r release/wwwroot/* docs/
+      
+      # Commit und Push der Änderungen
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add docs
+          git commit -m "Update GitHub Pages" || echo "No changes to commit"
+          git push
